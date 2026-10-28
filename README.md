@@ -1,4 +1,4 @@
-# T265 (TM2) support patch for librealsense v2.59.1
+# Unofficial T265 (TM2) support patch for librealsense v2.59.1
 
 Restores support for the end-of-life Intel RealSense T265 tracking
 camera to librealsense **v2.59.1** (upstream removed it in v2.54.1).
