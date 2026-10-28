@@ -111,7 +111,7 @@ fi
 
 # --- patch state + dirtiness -------------------------------------------------
 patch_applied=0
-git -C "$REPO" apply --reverse --check "$PATCH" 2>/dev/null && patch_applied=1
+git -C "$REPO" apply --reverse --check --whitespace=nowarn "$PATCH" 2>/dev/null && patch_applied=1
 
 tracked_changes="$(git -C "$REPO" status --porcelain --untracked-files=no)"
 if [ -n "$tracked_changes" ] && [ "$ALLOW_DIRTY" -eq 0 ]; then
@@ -137,7 +137,7 @@ if [ "$DO_UNAPPLY" -eq 1 ]; then
   git -C $REPO reset --hard HEAD~1" 1
     fi
     say "reverse-applying patch in $REPO ..."
-    git -C "$REPO" apply --reverse "$PATCH"
+    git -C "$REPO" apply --reverse --whitespace=nowarn "$PATCH"
     # a failed earlier --commit may leave the patch staged; the worktree is
     # now back at the base content, so unstaging loses nothing
     git -C "$REPO" reset --quiet
@@ -158,9 +158,11 @@ if [ "$DO_PATCH" -eq 1 ] && [ "$patch_applied" -eq 0 ]; then
         read -r ans
         [ "$ans" = "y" ] || [ "$ans" = "Y" ] || die "aborted by user"
     fi
-    git -C "$REPO" apply "$PATCH" \
+    # --whitespace=nowarn: the ported TM2 sources carry pre-existing trailing
+    # whitespace; the patch is faithful to them, so silence the cosmetic warning
+    git -C "$REPO" apply --whitespace=nowarn "$PATCH" \
         || die "git apply failed" 1
-    git -C "$REPO" apply --reverse --check "$PATCH" \
+    git -C "$REPO" apply --reverse --check --whitespace=nowarn "$PATCH" \
         || die "patch did not apply completely" 1
     say "applied: $(git -C "$REPO" diff --shortstat | sed 's/^ *//') (+ new files)"
     say "working tree is now v2.59.1 + T265 port (uncommitted)"
