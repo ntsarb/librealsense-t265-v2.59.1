@@ -3,6 +3,9 @@
 Restores support for the end-of-life Intel RealSense T265 tracking
 camera to librealsense **v2.59.1** (upstream removed it in v2.54.1).
 
+<img width="3759" height="2115" alt="image" src="https://github.com/user-attachments/assets/22c22dee-f08c-4738-8fe9-ab8433c87feb" />
+
+
 | File | What it is |
 |---|---|
 | `t265-port-v2.59.1.patch` | 29 source/build files (19 added, 10 modified); plain text; **no firmware, no prebuilt artifacts** |
