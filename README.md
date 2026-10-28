@@ -11,7 +11,7 @@ camera to librealsense **v2.59.1** (upstream removed it in v2.54.1).
 ## Where to apply it
 
 In the original repository's (https://github.com/realsenseai/librealsense)
-build process, the patch goes in **between obtaining the source and the
+build process (https://github.com/realsenseai/librealsense/blob/master/doc/installation.md), the patch goes in **between obtaining the source and the
 CMake configure step** — i.e. on the pristine v2.59.1 checkout, **before**
 you build:
 
