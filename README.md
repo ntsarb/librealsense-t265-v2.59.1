@@ -55,6 +55,11 @@ bash install-t265-patch.sh --repo /path/to/librealsense --unapply
 
 (after a commit of the patch: `git reset --hard HEAD~1`)
 
+## Related projects
+
+* [`ntsarb/realsense-ros-t265-v4.59.1`](https://github.com/ntsarb/realsense-ros-t265-v4.59.1) — restores T265 support to the `realsense2_camera` ROS 2 wrapper (4.59.1).
+* [`ntsarb/T265-demo`](https://github.com/ntsarb/T265-demo) — a Qt6 viewer for the T265 (3-D trajectory, fisheye images, IMU strips, CSV export); works directly with the SDK or with the wrapper's ROS 2 topics.
+
 ## license
 Apache License
 Version 2.0, January 2004
