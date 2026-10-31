@@ -40,12 +40,15 @@ https://github.com/realsenseai/librealsense/wiki/Build-Configuration).
 T265 support is on by default; `-DBUILD_WITH_TM2=OFF` at configure time
 gives the standard build.
 
-**Firmware:** not bundled with this patch. It is downloaded
-automatically during the CMake configure step (from the public
-conda-forge `librealsense-2.53.1` package, SHA1-verified) and cached in
-`<repo-parent>/.fw-cache`, so rebuilds work offline. Prerequisites for
-that download: `curl`, `unzip`, `zstd`, `nm`, `python3`; or pass a local
-copy via `install-t265-patch.sh --fw <file>` / `T265_FW_CACHE`.
+**Firmware:** not bundled with this patch (it is a proprietary
+Intel/RealSense, Inc. binary, and there is no authorized public download).
+The CMake configure step resolves it like this: a SHA1-verified cache at
+`<repo-parent>/.fw-cache/target.mvcmd` (override the directory with
+`T265_FW_CACHE`) is used when present; otherwise you must provide it
+explicitly — `install-t265-patch.sh --build` prompts for it, or pass
+`--fw <file>` / `--fw-source <url|path>`, or set `T265_FW_SOURCE` (a URL —
+`http://`, `https://`, `file://` — or a local file path). The image is
+SHA1-verified (v0.2.0.951) and cached, so rebuilds work offline.
 
 ## Reverting
 

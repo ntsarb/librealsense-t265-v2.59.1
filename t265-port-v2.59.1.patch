@@ -847,10 +847,10 @@ index 000000000..e71804067
 +say "Backup:    $(sed -n 's/^backup_dir=//p' "$STATE_FILE")"
 +say "Rollback:  sudo $0 --rollback"
 diff --git a/readme.md b/readme.md
-index a496afc71..0ba15b4a4 100644
+index a496afc71..f66cc1919 100644
 --- a/readme.md
 +++ b/readme.md
-@@ -77,6 +77,82 @@ Here are some examples of the supported models:
+@@ -77,6 +77,93 @@ Here are some examples of the supported models:
  
  > 🛍️ [Explore more stereo products](https://store.realsenseai.com/)
  
@@ -878,11 +878,22 @@ index a496afc71..0ba15b4a4 100644
 +cmake --build build --target realsense2 -j$(nproc)
 +cmake --build build --target rs-enumerate-devices -j$(nproc)
 +```
-+The T265 firmware (`target.mvcmd`, v0.2.0.951) is fetched at configure time by
-+`scripts/fetch-t265-fw.sh` (downloaded from the conda-forge librealsense-2.53.1
-+package, SHA1-verified, cached under `<repo-parent>/.fw-cache/`; override the
-+cache with `T265_FW_CACHE`). It is embedded into the library at build time, so
-+applications never download firmware.
++The T265 firmware (`target.mvcmd`, v0.2.0.951 — a proprietary Intel/RealSense,
++Inc. binary with no authorized public download) is resolved at configure time
++by `scripts/fetch-t265-fw.sh`. A SHA1-verified cache at
++`<repo-parent>/.fw-cache/target.mvcmd` (override the directory with
++`T265_FW_CACHE`) is used when present; otherwise you must provide the firmware
++explicitly — there is no default download source:
++
++```bash
++T265_FW_SOURCE=<url-or-local-path> cmake -B build -DCMAKE_BUILD_TYPE=Release
++```
++
++`T265_FW_SOURCE` accepts a URL (`http://`, `https://`, `file://`) or a local
++file path. The image is SHA1-verified (v0.2.0.951), cached, and embedded into
++the library at build time, so applications never download firmware. The
++`install-t265-patch.sh --build` installer prompts for this source
++interactively, or takes it via `--fw <file>` / `--fw-source <url|path>`.
 +
 +### Prebuilt Debian package
 +A signed `.deb` (`librealsense2-t265`) is published on the release page. It
@@ -935,111 +946,100 @@ index a496afc71..0ba15b4a4 100644
  Start developing with RealSense in minutes using either method below.
 diff --git a/scripts/fetch-t265-fw.sh b/scripts/fetch-t265-fw.sh
 new file mode 100755
-index 000000000..cd1801c15
+index 000000000..285cd2793
 --- /dev/null
 +++ b/scripts/fetch-t265-fw.sh
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,92 @@
 +#!/usr/bin/env bash
-+# Fetch the T265 (Myriad 2 / TM2) firmware image (target.mvcmd).
++# License: Apache 2.0. See LICENSE file in root directory.
++# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 +#
-+# Source: the conda-forge librealsense-2.53.1 linux-64 package, which embeds the
-+# FW inside librealsense2.so.2.53.1 (symbols fw_target_data / fw_target_size).
-+# The original Intel distribution URL (librealsense.intel.com/Releases/TM2/...)
-+# no longer exists.
++# Resolve the T265 (Myriad 2 / TM2) firmware image (target.mvcmd).
 +#
-+# The carved image is verified against the SHA1 that v2.53.1's CMake pins
-+# (T26X_FW_SHA1 in the original common/fw/CMakeLists.txt) and cached so
-+# rebuilds are offline. The resolved file path is printed on stdout; all
-+# progress goes to stderr.
++# The firmware is a proprietary Intel/RealSense, Inc. binary and there is no
++# authorized public download, so this script never fetches from a default
++# source. Resolution order:
 +#
-+# Usage: fetch-t265-fw.sh [output-path]
-+#   output-path defaults to $T265_FW_CACHE/target.mvcmd
-+#                ($T265_FW_CACHE defaults to <repo-parent>/.fw-cache)
++#   1. cache:  $T265_FW_CACHE/target.mvcmd (default: <repo-parent>/.fw-cache),
++#              used when present and SHA1-verified;
++#   2. source: $T265_FW_SOURCE — a URL (http://, https://, file://) or a local
++#              file path to the firmware image; fetched, SHA1-verified, cached;
++#   3. prompt: if stdin is a TTY and no source is set, ask the user interactively
++#              (note: cmake does not pass stdin through, so this only helps when
++#              the script is run directly or via a prompt-aware installer).
++#
++# The resolved cache path is printed on stdout; all progress goes to stderr.
++#
++# Environment:
++#   T265_FW_CACHE   cache directory (default: <repo-parent>/.fw-cache)
++#   T265_FW_SOURCE  URL or local path of the firmware image
 +set -euo pipefail
 +
 +FW_SHA1="c3940ccbb0e3045603e4aceaa2d73427f96e24bc"
++FW_VERSION="0.2.0.951"
 +FW_NAME="target.mvcmd"
++
 +# Default cache lives under the repo's parent directory (kept out of $HOME).
 +SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 +REPO_PARENT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 +CACHE_DIR="${T265_FW_CACHE:-$REPO_PARENT/.fw-cache}"
-+SOURCE_URL="${T265_FW_SOURCE_URL:-https://conda.anaconda.org/conda-forge/linux-64/librealsense-2.53.1-h8386552_6_cpu.conda}"
-+OUT="${1:-$CACHE_DIR/$FW_NAME}"
-+say() { echo "$@" >&2; }
++OUT="$CACHE_DIR/$FW_NAME"
++say() { echo "$*" >&2; }
 +
-+mkdir -p "$(dirname "$OUT")"
-+
++# --- cache hit ---------------------------------------------------------------
 +if [ -f "$OUT" ]; then
 +    if echo "$FW_SHA1  $OUT" | sha1sum -c --status 2>/dev/null; then
 +        say "T265 firmware cache hit: $OUT"
 +        echo "$OUT"
 +        exit 0
 +    fi
-+    say "T265 firmware cache invalid (SHA1 mismatch), re-fetching: $OUT"
++    say "T265 firmware cache invalid (SHA1 mismatch), re-resolving: $OUT"
 +    rm -f "$OUT"
 +fi
 +
-+for tool in python3 zstd unzip nm curl; do
-+    command -v "$tool" >/dev/null || { say "error: '$tool' is required"; exit 1; }
-+done
++# --- source: environment, then interactive prompt ----------------------------
++SRC="${T265_FW_SOURCE:-}"
++if [ -z "$SRC" ] && [ -t 0 ]; then
++    printf 'T265 firmware v%s (%s) is not cached and no source is set.\n' \
++        "$FW_VERSION" "$FW_NAME"
++    printf 'It must be provided explicitly (there is no default download source).\n'
++    printf 'Enter a URL (http/https/file) or a local file path: '
++    read -r SRC || SRC=""
++fi
++if [ -z "$SRC" ]; then
++    say "error: no T265 firmware source."
++    say "  The firmware is a proprietary Intel/RealSense binary; provide it explicitly:"
++    say "    T265_FW_SOURCE=<url-or-local-path>   (URL: http/https/file)"
++    say "  or place a verified copy at $OUT"
++    say "  expected SHA1: $FW_SHA1 (v$FW_VERSION)"
++    exit 1
++fi
 +
-+TMP="$(mktemp -d)"
-+trap 'rm -rf "$TMP"' EXIT
++TMP="$(mktemp)"
++trap 'rm -f "$TMP"' EXIT
 +
-+say "Downloading T265 firmware source package:"
-+say "  $SOURCE_URL"
-+curl -fSL --retry 3 -o "$TMP/pkg.conda" "$SOURCE_URL"
++# --- fetch ---------------------------------------------------------------------
++case "$SRC" in
++    http://*|https://*|file://*)
++        say "Fetching T265 firmware from: $SRC"
++        curl -fSL --retry 3 -o "$TMP" "$SRC" \
++            || { say "error: fetch failed: $SRC"; exit 1; } ;;
++    *)
++        [ -f "$SRC" ] || { say "error: firmware file not found: $SRC"; exit 1; }
++        say "Using local firmware file: $SRC"
++        cp "$SRC" "$TMP" ;;
++esac
 +
-+say "Extracting embedded SDK library ..."
-+unzip -o -q "$TMP/pkg.conda" -d "$TMP"
-+zstd -q -d "$TMP"/pkg-*.tar.zst -o "$TMP/pkg.tar"
-+tar -xf "$TMP/pkg.tar" -C "$TMP"
-+SO="$TMP/lib/librealsense2.so.2.53.1"
-+[ -f "$SO" ] || { say "error: $SO not found in the package"; exit 1; }
-+
-+say "Carving firmware from $SO ..."
-+# default nm format: "value type name"
-+nm --defined-only "$SO" | awk '$3=="fw_target_data"{print $1} $3=="fw_target_size"{print $1}' > "$TMP/symaddrs"
-+[ "$(wc -l < "$TMP/symaddrs")" -eq 2 ] || { say "error: fw_target_* symbols not found in $SO"; exit 1; }
-+
-+python3 - "$SO" "$OUT" "$TMP/symaddrs" <<'PYEOF'
-+import struct
-+import sys
-+
-+so_path, out_path, addrs_path = sys.argv[1], sys.argv[2], sys.argv[3]
-+vaddrs = [int(line.split()[0], 16) for line in open(addrs_path)]
-+data_vaddr, size_vaddr = vaddrs
-+
-+data = open(so_path, 'rb').read()
-+assert data[:4] == b'\x7fELF' and data[4] == 2, 'expected 64-bit ELF'
-+
-+e_phoff = struct.unpack_from('<Q', data, 0x20)[0]
-+e_phentsize = struct.unpack_from('<H', data, 0x36)[0]
-+e_phnum = struct.unpack_from('<H', data, 0x38)[0]
-+
-+def file_offset(vaddr):
-+    for i in range(e_phnum):
-+        off = e_phoff + i * e_phentsize
-+        (p_type,) = struct.unpack_from('<I', data, off)
-+        if p_type != 1:  # PT_LOAD
-+            continue
-+        p_offset, p_vaddr, _, p_filesz = struct.unpack_from('<QQQQ', data, off + 8)
-+        if p_vaddr <= vaddr < p_vaddr + p_filesz:
-+            return p_offset + (vaddr - p_vaddr)
-+    raise RuntimeError('vaddr 0x%x not covered by any PT_LOAD segment' % vaddr)
-+
-+data_off = file_offset(data_vaddr)
-+size_off = file_offset(size_vaddr)
-+size = struct.unpack_from('<i', data, size_off)[0]
-+if not (0 < size < len(data) - data_off):
-+    raise RuntimeError('implausible firmware size %d' % size)
-+
-+open(out_path, 'wb').write(data[data_off:data_off + size])
-+print('carved %d bytes' % size, file=sys.stderr)
-+PYEOF
-+
-+say "Verifying SHA1 ..."
-+echo "$FW_SHA1  $OUT" | sha1sum -c --strict >&2
++# --- verify + cache --------------------------------------------------------------
++if ! echo "$FW_SHA1  $TMP" | sha1sum -c --status 2>/dev/null; then
++    say "error: SHA1 mismatch for the firmware from: $SRC"
++    say "  expected: $FW_SHA1 (v$FW_VERSION)"
++    say "  got:      $(sha1sum "$TMP" | cut -d' ' -f1)"
++    exit 1
++fi
++mkdir -p "$CACHE_DIR"
++mv "$TMP" "$OUT"
++chmod 644 "$OUT"
 +say "T265 firmware ready: $OUT"
 +echo "$OUT"
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt

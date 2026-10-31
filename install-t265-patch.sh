@@ -42,9 +42,13 @@ Options:
   --build            configure + build realsense2 + rs-enumerate-devices
   --unapply          reverse-apply the patch (restore pristine v2.59.1)
   --build-dir <d>    build directory (default: <repo>/build)
-  --fw <file>        T265 firmware file, seeded into the build's FW cache
+  --fw <file>        local T265 firmware file (target.mvcmd), seeded into the
+                     build's FW cache
+  --fw-source <src>  T265 firmware source: URL (http/https/file) or local path;
+                     exported as T265_FW_SOURCE for the configure-time fetch
   --allow-dirty      proceed despite tracked local modifications
-  --yes              do not prompt
+  --yes              do not prompt (the firmware must then come from --fw,
+                     --fw-source, T265_FW_SOURCE, or a valid T265_FW_CACHE)
   --help             this help
 EOF
 }
@@ -57,6 +61,7 @@ DO_BUILD=0
 DO_UNAPPLY=0
 BUILD_DIR=""
 FW=""
+FW_SOURCE=""
 ALLOW_DIRTY=0
 ASSUME_YES=0
 
@@ -69,6 +74,7 @@ while [ $# -gt 0 ]; do
         --unapply)     DO_UNAPPLY=1; DO_PATCH=0; shift ;;
         --build-dir)   BUILD_DIR="${2:?--build-dir needs a value}"; shift 2 ;;
         --fw)          FW="${2:?--fw needs a value}"; shift 2 ;;
+        --fw-source)   FW_SOURCE="${2:?--fw-source needs a value}"; shift 2 ;;
         --allow-dirty) ALLOW_DIRTY=1; shift ;;
         --yes)         ASSUME_YES=1; shift ;;
         --help|-h)     usage; exit 0 ;;
@@ -190,22 +196,53 @@ fi
 if [ "$DO_BUILD" -eq 1 ]; then
     [ -n "$BUILD_DIR" ] || BUILD_DIR="$REPO/build"
 
-    fw_cache="${T265_FW_CACHE:-}"
+    # Firmware resolution. The T265 firmware is a proprietary Intel/RealSense
+    # binary; scripts/fetch-t265-fw.sh has no default download source, so it
+    # must come from the cache, an explicit source (local file or URL), or an
+    # interactive prompt.
     if [ -n "$FW" ]; then
         [ -f "$FW" ] || die "--fw file not found: $FW" 2
         if ! echo "$FW_SHA1  $FW" | sha1sum -c --status 2>/dev/null; then
             die "firmware SHA1 mismatch: $FW (expected $FW_SHA1)" 2
         fi
-        fw_cache="$BUILD_DIR/fw-cache"
-        mkdir -p "$fw_cache"
-        cp "$FW" "$fw_cache/target.mvcmd"
-        say "firmware seeded into $fw_cache/target.mvcmd"
-        export T265_FW_CACHE="$fw_cache"
+        mkdir -p "$BUILD_DIR/fw-cache"
+        cp "$FW" "$BUILD_DIR/fw-cache/target.mvcmd"
+        say "firmware seeded into $BUILD_DIR/fw-cache/target.mvcmd"
+        export T265_FW_CACHE="$BUILD_DIR/fw-cache"
     fi
-    if [ -n "$fw_cache" ]; then
-        say "T265_FW_CACHE=$fw_cache"
-    else
-        say "firmware: scripts/fetch-t265-fw.sh will resolve the cache (download if missing)"
+    if [ -n "$FW_SOURCE" ]; then
+        export T265_FW_SOURCE="$FW_SOURCE"
+        say "firmware source (from --fw-source): $FW_SOURCE"
+    fi
+
+    fw_available=0
+    cache_dir="${T265_FW_CACHE:-}"
+    if [ -n "$cache_dir" ] \
+        && echo "$FW_SHA1  $cache_dir/target.mvcmd" | sha1sum -c --status 2>/dev/null; then
+        fw_available=1
+        say "firmware: cache hit in $cache_dir/target.mvcmd"
+    fi
+    if [ "$fw_available" -eq 0 ] && [ -n "${T265_FW_SOURCE:-}" ]; then
+        fw_available=1
+        say "firmware source (from environment): $T265_FW_SOURCE"
+    fi
+    if [ "$fw_available" -eq 0 ]; then
+        if [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
+            die "no T265 firmware available (proprietary binary; there is no default download source).
+Provide it with one of:
+  --fw <file>            local firmware file (target.mvcmd, v0.2.0.951)
+  --fw-source <src>      URL (http/https/file) or local path to the firmware
+  T265_FW_SOURCE=<src>   URL or local path, in the environment
+  T265_FW_CACHE=<dir>    cache directory already containing a verified target.mvcmd
+expected SHA1: $FW_SHA1" 2
+        fi
+        printf 'T265 firmware v0.2.0.951 is not cached and no source is set\n'
+        printf '(proprietary binary; there is no default download source).\n'
+        printf 'Enter a URL (http/https/file) or a local file path: '
+        read -r ans
+        [ -n "$ans" ] || die "firmware source required; aborted" 2
+        export T265_FW_SOURCE="$ans"
+        say "firmware source: $ans (SHA1-verified at configure time)"
     fi
 
     say "configuring in $BUILD_DIR ..."
