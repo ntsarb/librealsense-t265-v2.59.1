@@ -3,7 +3,7 @@
 Restores support for the end-of-life Intel RealSense T265 tracking
 camera to librealsense **v2.59.1** (upstream removed it in v2.54.1).
 
-<img width="3759" height="2115" alt="image" src="https://github.com/user-attachments/assets/22c22dee-f08c-4738-8fe9-ab8433c87feb" />
+<img alt="image" src="https://github.com/user-attachments/assets/22c22dee-f08c-4738-8fe9-ab8433c87feb" />
 
 
 | File | What it is |
@@ -41,13 +41,13 @@ T265 support is on by default; `-DBUILD_WITH_TM2=OFF` at configure time
 gives the standard build.
 
 **Firmware:** not bundled with this patch (it is a proprietary
-Intel/RealSense, Inc. binary, and there is no authorized public download).
+Intel/RealSense, Inc. binary).
 The CMake configure step resolves it like this: a SHA1-verified cache at
 `<repo-parent>/.fw-cache/target.mvcmd` (override the directory with
 `T265_FW_CACHE`) is used when present; otherwise you must provide it
-explicitly — `install-t265-patch.sh --build` prompts for it, or pass
-`--fw <file>` / `--fw-source <url|path>`, or set `T265_FW_SOURCE` (a URL —
-`http://`, `https://`, `file://` — or a local file path). The image is
+explicitly; `install-t265-patch.sh --build` prompts for it, or pass
+`--fw <file>` / `--fw-source <url|path>`, or set `T265_FW_SOURCE` to a URL
+(`http://`, `https://`, `file://`) or a local file path. The image is
 SHA1-verified (v0.2.0.951) and cached, so rebuilds work offline.
 
 ## Reverting

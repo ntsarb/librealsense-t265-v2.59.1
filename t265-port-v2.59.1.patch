@@ -229,7 +229,7 @@ index 1c79e0c48..9fa87cd96 100644
  
 diff --git a/packaging/README-upgrade.md b/packaging/README-upgrade.md
 new file mode 100644
-index 000000000..8cc365285
+index 000000000..e39b03182
 --- /dev/null
 +++ b/packaging/README-upgrade.md
 @@ -0,0 +1,55 @@
@@ -241,12 +241,12 @@ index 000000000..8cc365285
 +
 +## Contents
 +
-+- `t265-upgrade.sh` — the upgrade script (detect, validate, backup, swap,
++- `t265-upgrade.sh`: the upgrade script (detect, validate, backup, swap,
 +  verify, rollback)
-+- `librealsense2.so.2.59.1` — the T265 fork's core library (T265 firmware
++- `librealsense2.so.2.59.1`: the T265 fork's core library (T265 firmware
 +  embedded)
-+- `librealsense2.so.2.59.1.sha256` — its SHA256
-+- `README-upgrade.md` — this file
++- `librealsense2.so.2.59.1.sha256`: its SHA256
++- `README-upgrade.md`: this file
 +
 +## What it does
 +
@@ -847,12 +847,12 @@ index 000000000..e71804067
 +say "Backup:    $(sed -n 's/^backup_dir=//p' "$STATE_FILE")"
 +say "Rollback:  sudo $0 --rollback"
 diff --git a/readme.md b/readme.md
-index a496afc71..f66cc1919 100644
+index a496afc71..da30292a3 100644
 --- a/readme.md
 +++ b/readme.md
-@@ -77,6 +77,93 @@ Here are some examples of the supported models:
+@@ -146,6 +146,93 @@ cmake .. -DBUILD_WITH_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1100
  
- > 🛍️ [Explore more stereo products](https://store.realsenseai.com/)
+ > **Note:** `BUILD_WITH_CUDA` and `BUILD_WITH_HIP` are mutually exclusive. See [doc/amd-hip-support.md](doc/amd-hip-support.md) for details.
  
 +## T265 (TM2) Tracking Camera Support
 +
@@ -866,8 +866,8 @@ index a496afc71..f66cc1919 100644
 +### Streams
 +| Stream | Resolution / Type | Rate |
 +|--------|-------------------|------|
-+| Fisheye ×2 | 848×800 Y8 | 30 Hz |
-+| Pose (6-DOF) | — | 200 Hz |
++| Fisheye x2 | 848x800 Y8 | 30 Hz |
++| Pose (6-DOF) | - | 200 Hz |
 +| Gyro | XYZ32F | 200 Hz |
 +| Accel | XYZ32F | 62 Hz |
 +
@@ -878,12 +878,12 @@ index a496afc71..f66cc1919 100644
 +cmake --build build --target realsense2 -j$(nproc)
 +cmake --build build --target rs-enumerate-devices -j$(nproc)
 +```
-+The T265 firmware (`target.mvcmd`, v0.2.0.951 — a proprietary Intel/RealSense,
++The T265 firmware (`target.mvcmd`, v0.2.0.951, a proprietary Intel/RealSense,
 +Inc. binary with no authorized public download) is resolved at configure time
 +by `scripts/fetch-t265-fw.sh`. A SHA1-verified cache at
 +`<repo-parent>/.fw-cache/target.mvcmd` (override the directory with
 +`T265_FW_CACHE`) is used when present; otherwise you must provide the firmware
-+explicitly — there is no default download source:
++explicitly (there is no default download source):
 +
 +```bash
 +T265_FW_SOURCE=<url-or-local-path> cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -898,7 +898,7 @@ index a496afc71..f66cc1919 100644
 +### Prebuilt Debian package
 +A signed `.deb` (`librealsense2-t265`) is published on the release page. It
 +contains the `librealsense2` library, headers, `rs-enumerate-devices`, the CMake
-+package config, the pkg-config file and the udev rules — no RealSense Viewer
++package config, the pkg-config file and the udev rules: no RealSense Viewer
 +(keep the one you already have; it is ABI-compatible).
 +
 +```bash
@@ -923,7 +923,7 @@ index a496afc71..f66cc1919 100644
 +
 +The fork's core library is a strict ABI superset of the standard one (same
 +soname, byte-identical headers, T265 firmware embedded), so only
-+`librealsense2.so.2.59.1` is replaced — existing tools, headers and CMake
++`librealsense2.so.2.59.1` is replaced; existing tools, headers and CMake
 +config stay in place.
 +
 +### Notes
@@ -939,14 +939,14 @@ index a496afc71..f66cc1919 100644
 +- The T265 firmware is Intel-proprietary and EOL; no further official updates.
 +  This is why the repository and package stay private.
 +- **Firmware license:** the embedded T265 firmware is Intel/RealSense, Inc.
-+  proprietary — it is *not* part of the Apache-2.0 license. See `LEGAL.md`.
++  proprietary; it is *not* part of the Apache-2.0 license. See `LEGAL.md`.
 +
- ## Getting Started
- 
- Start developing with RealSense in minutes using either method below.
+ ## Python Packages
+ [![pyrealsense2](https://img.shields.io/pypi/v/pyrealsense2.svg?label=pyrealsense2&logo=pypi)](https://pypi.org/project/pyrealsense2/)
+ [![PyPI - pyrealsense2-beta](https://img.shields.io/pypi/v/pyrealsense2-beta.svg?label=pyrealsense2-beta&logo=pypi)](https://pypi.org/project/pyrealsense2-beta/)
 diff --git a/scripts/fetch-t265-fw.sh b/scripts/fetch-t265-fw.sh
 new file mode 100755
-index 000000000..285cd2793
+index 000000000..efbae2745
 --- /dev/null
 +++ b/scripts/fetch-t265-fw.sh
 @@ -0,0 +1,92 @@
@@ -962,7 +962,7 @@ index 000000000..285cd2793
 +#
 +#   1. cache:  $T265_FW_CACHE/target.mvcmd (default: <repo-parent>/.fw-cache),
 +#              used when present and SHA1-verified;
-+#   2. source: $T265_FW_SOURCE — a URL (http://, https://, file://) or a local
++#   2. source: $T265_FW_SOURCE, a URL (http://, https://, file://) or a local
 +#              file path to the firmware image; fetched, SHA1-verified, cached;
 +#   3. prompt: if stdin is a TTY and no source is set, ask the user interactively
 +#              (note: cmake does not pass stdin through, so this only helps when
